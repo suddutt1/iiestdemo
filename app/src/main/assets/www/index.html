@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>jQuery Mobile: Theme Download</title>
+    <link rel="stylesheet" href="themes/green.min.css" />
+    <link rel="stylesheet" href="themes/jquery.mobile.icons.min.css" />
+    <link rel="stylesheet" href="themes/jquery.mobile.structure-1.4.5.min.css" />
+    <script src="js/mustache.min.js"></script>
+    <script src="js/jquery-1.11.1.min.js"></script>
+    <script src="js/jquery.mobile-1.4.5.min.js"></script>
+
+</head>
+<body>
+    <!-- Home page starts -->
+    <div data-role="page" id="homePage" >
+        <div data-role="header" ><h1 style="white-space:normal;">My Weather Watch</h1></div>
+        <div data-role="content" style="text-align:center">
+            <h2>Current location weather </h2>
+            <div id="homeWeather">
+
+            </div>
+        </div>
+        <div data-role="footer" data-position="fixed">
+            <div data-role="navbar"  >
+                <ul>
+                    <li><button data-icon="cloud" onclick="saveLocation()" >Save Location</button></li>
+                    <li><button data-icon="bars" onclick="viewLocation()" >View Saved Locations</button></li>
+                </ul>
+            </div>
+            <h3>&copy;My Weather Watch 2016</h3>
+        </div>
+    </div>
+    <!-- Home page ends -->
+    <!-- Saved location page starts -->
+    <div data-role="page" id="savedLocations">
+        <div data-role="header" >
+            <h1 style="white-space:normal;">My Weather Watch</h1>
+        </div>
+        <div data-role="content" >
+            <h3 style="text-align:center">View your saved location weather</h3>
+            <!-- Collapsible list -->
+            <div id="savedLocationListContainer">
+            </div>
+
+        </div>
+        <div data-role="footer" data-position="fixed">
+            <div data-role="navbar"  >
+                <ul>
+                    <li><a href="#homePage" class="ui-btn ui-icon-home ui-btn-icon-top">Home</a></li>
+                    <li><a href="#homePage" class="ui-btn ui-icon-back ui-btn-icon-top"  >Back</a></li>
+                </ul>
+            </div>
+            <h3>&copy;My Weather Watch 2016</h3>
+        </div>
+    </div>
+    <!-- Saved location page ends -->
+    <script>
+    var homeLatitude;
+    var homeLongitude;
+
+    $(document).on("pagebeforeshow","#homePage",function(){
+        loadLandingPage();
+    });
+    $(document).on("pagebeforeshow","#savedLocations",function(){
+        //loadSavedLocations();
+    });
+
+    function viewLocation()
+    {
+        //$( ":mobile-pagecontainer" ).pagecontainer( "change", "#savedLocations",{ transition:"slide",changeHash:false} );
+        loadSavedLocations()
+    }
+    function loadSavedLocations()
+    {
+         var devId = getDeviceId();
+         $.ajax({
+              type: "GET",
+              url: "https://iist-demo.mybluemix.net/api/getgeolocation/"+devId ,
+              headers: {"Origin": "http://ibm.com" },
+              contentType : "application/json",
+              success: displaySavedLocations,
+              error:displayError,
+              dataType : "json"
+            });
+    }
+    function displaySavedLocations(data)
+    {
+        if(data.length>0)
+        {
+            //Showing last one locations
+                $("#locationListItem").collapsibleset("destroy");
+				//Clean up the old items
+				$("#savedLocationListContainer").empty();
+				//Create  the items html
+				var template = $('#locationDetails').html();
+				var obj_array = [];
+				for (idx in data){
+
+                    obj_array.push ({'index': idx, 'LATITUDE': data[idx].LATITUDE ,'LONGITUDE' : data[idx].LONGITUDE } );
+                }
+				var html = Mustache.to_html(template, {"items": obj_array});
+				$("#savedLocationListContainer").html(html);
+				//Enhance it
+				oldCollapsibleSet = $("#locationListItem").collapsibleset({
+					collapsedIcon: "arrow-r"
+				}).enhanceWithin();
+				$( ":mobile-pagecontainer" ).pagecontainer( "change", "#savedLocations",{} );
+        }
+        else
+        {
+            showAlert("No saved data");
+        }
+    }
+    function saveLocation()
+    {
+        var devId = getDeviceId();
+        var dataToPost = '{ "id": "'+ devId + '" , "flag":'+'"Y"'+ ', "lat" : '+homeLatitude +' ,"lng" : '+ homeLongitude +' }' ;
+
+        $.ajax({
+              type: "POST",
+              url: "https://iist-demo.mybluemix.net/api/getweatherdata" ,
+              headers: {"Origin": "http://ibm.com" },
+              contentType : "application/json",
+              data: dataToPost,
+              success: saveSuccess,
+              error:displayError,
+              dataType : "json"
+            });
+
+    }
+    function saveSuccess(data)
+    {
+        if(data.sky_cover)
+        {
+            showAlert("Saved");
+        }
+    }
+    function displayError(xhr,statusText,errorThrown)
+    {
+       showAlert("AJAX CALL ERROR: "+ statusText);
+    }
+    function loadLandingPage()
+    {
+        if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(displayWeather);
+        } else {
+            var position = { "coords" : { "latitude" : 23.333 , "longitude": 88.34} } ;
+            displayWeather(position);
+        }
+    }
+
+    function displayWeather(position)
+    {
+        homeLatitude =  position.coords.latitude;
+        homeLongitude=   position.coords.longitude;
+        var devId = getDeviceId();
+        var dataToPost = '{ "id": "'+ devId + '" , "flag":'+'"N"'+ ', "lat" : '+homeLatitude +' ,"lng" : '+ homeLongitude +' }' ;
+
+        $.ajax({
+              type: "POST",
+              url: "https://iist-demo.mybluemix.net/api/getweatherdata" ,
+              headers: {"Origin": "http://ibm.com" },
+              contentType : "application/json",
+              data: dataToPost,
+              success: showWeatherDetails,
+              error:displayError,
+              dataType : "json"
+            });
+
+    }
+    function showWeatherDetails(data)
+    {
+        console.log(data);
+        var skyCover = data.sky_cover;
+        var temp = data.temp;
+        var tempFeel = data.temp_feel;
+        $("#homeWeather").html(getWeatherDescription(skyCover,temp,tempFeel));
+    }
+    function getWeatherDescription(skyCover, temp, tempFeel)
+    {
+        return "<b>Sky Condition :"+skyCover +"</b><br/>" + "<b>Temperature: "+temp+" &#8451 </b><br/>"+"<b>Feels Like:"+tempFeel+" &#8451 </b><br/>"
+    }
+    function getDeviceId()
+    {
+        try{
+            return Android.getDeviceId();
+        }catch(e)
+        {
+            console.log("Falling back to default value");
+        }
+        return "suddutt1";
+    }
+    function showAlert(message)
+    {
+        if(typeof Android === 'undefined')
+        {
+         alert(message);
+        }
+        else
+        {
+            Android.showAlert(message);
+        }
+
+    }
+    function loadWeather(lat,lng,divId)
+    {
+        var devId = getDeviceId();
+        var dataToPost = '{ "id": "'+ devId + '" , "flag":'+'"N"'+ ', "lat" : '+lat +' ,"lng" : '+ lng +' }' ;
+
+        $.ajax({
+              type: "POST",
+              url: "https://iist-demo.mybluemix.net/api/getweatherdata" ,
+              headers: {"Origin": "http://ibm.com" },
+              contentType : "application/json",
+              data: dataToPost,
+              success: function(data){
+                $("#"+divId).html(getWeatherDescription(data.sky_cover,data.temp,data.temp_feel));
+              },
+              error:displayError,
+              dataType : "json"
+            });
+
+
+    }
+    </script>
+    <script id="locationDetails" type="text/template">
+        <div data-role="collapsible-set"  id="locationListItem" data-iconpos ="right" >
+            {{#items}}
+            <div data-role="collapsible">
+                <h3>Location <br/> {{LATITUDE}} : {{ LONGITUDE}}</h3>
+                <div data-role="content">
+                    <h4>Current Weather in the location  </h4>
+                    <div id="details_{{index}}">
+                    </div>
+                    <input type="button" value="Fetch" data-theme="c" onclick="loadWeather({{LATITUDE}}, {{LONGITUDE}},'details_{{index}}')" />
+                </div>
+            </div>
+            {{/items}}
+        </div>
+    </script>
+
+</body>
+</html>
